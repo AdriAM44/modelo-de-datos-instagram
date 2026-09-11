@@ -1,19 +1,73 @@
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import String, Boolean
-from sqlalchemy.orm import Mapped, mapped_column
+import os
+import sys
+from sqlalchemy import Column, ForeignKey, Integer, String, Enum
+from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy import create_engine
+from eralchemy2 import render_er
+import enum
 
-db = SQLAlchemy()
+Base = declarative_base()
 
-class User(db.Model):
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean(), nullable=False)
+class MediaType(enum.Enum):
+    image = "image"
+    video = "video"
 
+class User(Base):
+    __tablename__ = 'user'
+    id = Column(Integer, primary_key=True)
+    username = Column(String(250), nullable=False, unique=True)
+    firstname = Column(String(250), nullable=False)
+    lastname = Column(String(250), nullable=False)
+    email = Column(String(250), nullable=False, unique=True)
 
-    def serialize(self):
-        return {
-            "id": self.id,
-            "email": self.email,
-            # do not serialize the password, its a security breach
-        }
+    # Relaciones
+    posts = relationship("Post", back_populates="user")
+    comments = relationship("Comment", back_populates="user")
+
+class Follower(Base):
+    __tablename__ = 'follower'
+    id = Column(Integer, primary_key=True)
+    user_from_id = Column(Integer, ForeignKey('user.id'), nullable=False)
+    user_to_id = Column(Integer, ForeignKey('user.id'), nullable=False)
+
+class Post(Base):
+    __tablename__ = 'post'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
+
+    # Relaciones
+    user = relationship("User", back_populates="posts")
+    media = relationship("Media", back_populates="post")
+    comments = relationship("Comment", back_populates="post")
+
+class Media(Base):
+    __tablename__ = 'media'
+    id = Column(Integer, primary_key=True)
+    type = Column(Enum(MediaType), nullable=False)
+    url = Column(String(250), nullable=False)
+    post_id = Column(Integer, ForeignKey('post.id'), nullable=False)
+
+    # Relación
+    post = relationship("Post", back_populates="media")
+
+class Comment(Base):
+    __tablename__ = 'comment'
+    id = Column(Integer, primary_key=True)
+    comment_text = Column(String(500), nullable=False)
+    author_id = Column(Integer, ForeignKey('user.id'), nullable=False)
+    post_id = Column(Integer, ForeignKey('post.id'), nullable=False)
+
+    # Relaciones
+    user = relationship("User", back_populates="comments")
+    post = relationship("Post", back_populates="comments")
+
+    def to_dict(self):
+        return {}
+
+## Generación del diagrama UML
+try:
+    result = render_er(Base, 'diagram.png')
+    print("Success! Check the diagram.png file")
+except Exception as e:
+    print("There was a problem generating the diagram")
+    raise e
